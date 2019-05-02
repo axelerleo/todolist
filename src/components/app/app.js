@@ -5,6 +5,8 @@ import SearchBar from "../search-bar";
 import TodoList from "../todo-list";
 import ItemStatusFilter from "../item-status-filter";
 import AddItem from "../add-item";
+import firebase from "../../firebaseConfig/config";
+import "firebase/database";
 
 import "./app.css";
 
@@ -13,38 +15,64 @@ export default class App extends Component {
 
   state = {
     todoData: [
-      this.createTodoItem("Kiss wife"),
-      this.createTodoItem("Drink coffee"),
-      this.createTodoItem("Learn React")
+      // this.createTodoItem("Kiss wife"),
+      // this.createTodoItem("Drink coffee"),
+      // this.createTodoItem("Learn React")
     ],
     searchText: "",
     filter: "all"
   };
 
+  db = firebase
+    .database()
+    .ref()
+    .child("tasks");
+
+  componentWillMount() {
+    const prevTodoData = [...this.state.todoData];
+    this.db.on("child_added", snap => {
+      const { label, important, done } = snap.val();
+      prevTodoData.push({
+        label: label,
+        important: important,
+        done: done,
+        id: snap.key
+      });
+      this.setState({ todoData: prevTodoData });
+    });
+
+    this.db.on("child_removed", snap => {
+      const prevTodoData = [...this.state.todoData];
+      const idx = prevTodoData.findIndex(el => el.id === snap.key);
+      const newTodoData = [...prevTodoData];
+      newTodoData.splice(idx, 1);
+
+      this.setState({ todoData: newTodoData });
+    });
+  }
+
   createTodoItem(text) {
     return {
       label: text,
       important: false,
-      done: false,
-      id: this.maxId++
+      done: false
+      // id: id
     };
   }
 
   deleteItem = id => {
-    this.setState(({ todoData }) => {
-      const idx = todoData.findIndex(el => el.id === id);
-      const newTodoData = [...todoData];
-      newTodoData.splice(idx, 1);
-      return { todoData: newTodoData };
-    });
+    this.db.child(id).remove();
   };
+
   addItem = text => {
     const newItem = this.createTodoItem(text);
-    this.setState(({ todoData }) => {
-      const newTodoData = [...todoData, newItem];
 
-      return { todoData: newTodoData };
-    });
+    this.db.push().set(newItem);
+    // this.setState(({ todoData }) => {
+    //   const newTodoData = [...todoData, newItem];
+
+    //   return { todoData: newTodoData };
+    // });
   };
 
   toggleProperty = (arr, id, propName) => {
